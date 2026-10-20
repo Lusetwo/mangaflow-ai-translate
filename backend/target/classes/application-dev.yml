@@ -1,0 +1,25 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/db_mangaflow
+    username: postgres
+    password: 123456
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      minimum-idle: 5
+      maximum-pool-size: 10
+      idle-timeout: 600000
+      connection-timeout: 30000
+  sql:
+    init:
+      mode: always # 开发环境每次启动都执行 schema.sql / data.sql
+      # schema-locations: classpath:db/schema.sql
+      # data-locations: classpath:db/data.sql
+
+mybatis-plus:
+  configuration:
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl # 开发环境打印 SQL
+
+logging:
+  level:
+    root: info
+    com.translate: debug # 开发环境开启 debug

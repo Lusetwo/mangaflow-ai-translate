@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.translate.dao.TranslationRegionMapper">
+
+    <resultMap id="BaseResultMap" type="com.translate.entity.TranslationRegion">
+        <id     column="id"              property="id"/>
+        <result column="task_id"         property="taskId"/>
+        <result column="region_no"       property="regionNo"/>
+        <result column="x"               property="x"/>
+        <result column="y"               property="y"/>
+        <result column="width"           property="width"/>
+        <result column="height"          property="height"/>
+        <result column="original_text"   property="originalText"/>
+        <result column="translated_text" property="translatedText"/>
+        <result column="status"          property="status"/>
+        <result column="created_at"      property="createdAt"/>
+        <result column="updated_at"      property="updatedAt"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id, task_id, region_no, x, y, width, height,
+        original_text, translated_text, status, created_at, updated_at
+    </sql>
+
+    <!-- 1. 按 task_id 查询所有区域，按区域序号排序 -->
+    <select id="selectByTaskId" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM tb_translation_region
+        WHERE task_id = #{taskId}
+        ORDER BY region_no ASC
+    </select>
+
+    <!-- 2. 查询某任务下待翻译的区域 -->
+    <select id="selectPendingByTaskId" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM tb_translation_region
+        WHERE task_id = #{taskId}
+        AND status = 'OCR_DONE'
+        ORDER BY region_no ASC
+    </select>
+
+    <!-- 3. 批量插入区域（用 PostgreSQL 的 VALUES 语法） -->
+    <insert id="batchInsert">
+        INSERT INTO tb_translation_region
+        (task_id, region_no, x, y, width, height, original_text, status)
+        VALUES
+        <foreach collection="list" item="item" separator=",">
+            (#{item.taskId}, #{item.regionNo}, #{item.x}, #{item.y},
+            #{item.width}, #{item.height}, #{item.originalText},
+            COALESCE(#{item.status}, 'PENDING'))
+        </foreach>
+    </insert>
+
+    <!-- 4. 批量更新译文 -->
+    <update id="batchUpdateTranslated">
+        <foreach collection="list" item="item" separator=";">
+            UPDATE tb_translation_region
+            SET translated_text = #{item.translatedText},
+            status = 'TRANSLATED'
+            WHERE task_id = #{item.taskId}
+            AND region_no = #{item.regionNo}
+        </foreach>
+    </update>
+
+    <!-- 5. 统计某任务的区域状态分布 -->
+    <select id="countByStatus" resultType="com.translate.dto.StatusCountDTO">
+        SELECT status AS status, COUNT(*) AS cnt
+        FROM tb_translation_region
+        WHERE task_id = #{taskId}
+        GROUP BY status
+    </select>
+
+    <!-- 6. 查询任务及所有区域（联表） -->
+    <select id="selectTaskWithRegions" resultType="com.translate.dto.TaskRegionDTO">
+        SELECT t.task_no        AS taskNo,
+               t.status         AS taskStatus,
+               r.region_no      AS regionNo,
+               r.original_text  AS originalText,
+               r.translated_text AS translatedText
+        FROM tb_translation_task t
+                 JOIN tb_translation_region r ON r.task_id = t.id
+        WHERE t.task_no = #{taskNo}
+        ORDER BY r.region_no
+    </select>
+
+    <!-- 7. 根据区域完成情况更新任务进度 -->
+    <update id="updateTaskProgressByRegions">
+        UPDATE tb_translation_task t
+        SET progress = sub.pct
+            FROM (
+            SELECT task_id,
+                   ROUND(COUNT(*) FILTER (WHERE status = 'TRANSLATED') * 100.0
+                         / NULLIF(COUNT(*), 0)) AS pct
+            FROM tb_translation_region
+            WHERE task_id = #{taskId}
+            GROUP BY task_id
+            ) sub
+        WHERE t.id = sub.task_id
+    </update>
+
+</mapper>

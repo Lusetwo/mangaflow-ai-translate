@@ -1,0 +1,67 @@
+server:
+  port: 9001
+
+spring:
+  application:
+    name: mangaflow-backend
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev} # 默认激活 dev 环境
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 25MB
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: GMT+8
+    default-property-inclusion: non_null
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    db-config:
+      id-type: auto
+      logic-delete-field: deleted # 如果有逻辑删除需求可开启
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+#日志编码
+logging:
+  charset:
+    console: UTF-8
+    file: UTF-8
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+  api-docs:
+    path: /v3/api-docs
+
+mangaflow:
+  storage:
+    root-dir: ${STORAGE_ROOT:./storage}
+    max-file-size-bytes: 20971520 # 20MB
+  pipeline:
+    demo-enabled: ${DEMO_PIPELINE_ENABLED:false}
+  ai:
+    base-url: ${AI_BASE_URL:http://localhost:9000} # Python AI 服务地址
+    connect-timeout: 5000 # 连接超时 5s
+    read-timeout: 60000   # 读取超时 60s (AI 处理耗时较长)
+  task:
+    max-retry: 5 # 任务最大重试次数
+  async:
+    executor:
+      core-pool-size: 4
+      max-pool-size: 8
+      queue-capacity: 100
+      keep-alive-seconds: 60
+      thread-name-prefix: mangaflow-task-

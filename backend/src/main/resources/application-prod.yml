@@ -1,0 +1,32 @@
+spring:
+  datasource:
+    url: ${DB_URL} # 必须通过环境变量注入
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      minimum-idle: 10
+      maximum-pool-size: 50 # 根据实际并发调整
+      idle-timeout: 600000
+      connection-timeout: 30000
+      max-lifetime: 1800000
+  sql:
+    init:
+      mode: never # 生产环境禁止自动初始化数据库
+
+mybatis-plus:
+  configuration:
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl # 生产环境使用 slf4j
+
+logging:
+  level:
+    root: warn
+    com.mangaflow: info
+  file:
+    name: ./logs/mangaflow-backend.log # 生产环境输出到文件
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health # 生产环境只暴露 health，避免泄露敏感信息

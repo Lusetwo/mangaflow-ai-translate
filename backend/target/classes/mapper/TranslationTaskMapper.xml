@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.translate.dao.TranslationTaskMapper">
+
+    <!-- 通用查询结果映射 -->
+    <resultMap id="BaseResultMap" type="com.translate.entity.TranslationTask">
+        <id     column="id"            property="id"/>
+        <result column="task_no"       property="taskNo"/>
+        <result column="status"        property="status"/>
+        <result column="stage"         property="stage"/>
+        <result column="source_lang"   property="sourceLang"/>
+        <result column="target_lang"   property="targetLang"/>
+        <result column="original_path" property="originalPath"/>
+        <result column="result_path"   property="resultPath"/>
+        <result column="progress"      property="progress"/>
+        <result column="error_message" property="errorMessage"/>
+        <result column="retry_count"   property="retryCount"/>
+        <result column="created_at"    property="createdAt"/>
+        <result column="updated_at"    property="updatedAt"/>
+    </resultMap>
+
+    <!-- 通用列 -->
+    <sql id="Base_Column_List">
+        id, task_no, status, stage, source_lang, target_lang,
+        original_path, result_path, progress, error_message,
+        retry_count, created_at, updated_at
+    </sql>
+
+    <!-- 1. 按 task_no 查询 -->
+    <select id="selectByTaskNo" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM tb_translation_task
+        WHERE task_no = #{taskNo}
+    </select>
+
+    <!-- 2. 按状态分页查询 -->
+    <select id="selectPageByStatus" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM tb_translation_task
+        <where>
+            <if test="status != null and status != ''">
+                AND status = #{status}
+            </if>
+        </where>
+        ORDER BY created_at DESC
+    </select>
+
+    <!-- 3. 并发拉取待处理任务（SKIP LOCKED，队列模式） -->
+    <select id="fetchPendingTasks" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM tb_translation_task
+        WHERE status = 'PENDING'
+        ORDER BY created_at ASC
+        LIMIT #{limit}
+        FOR UPDATE SKIP LOCKED
+    </select>
+
+    <!-- 4. 统计各状态任务数 -->
+    <select id="countByStatus" resultType="com.translate.dto.StatusCountDTO">
+        SELECT status AS status, COUNT(*) AS cnt
+        FROM tb_translation_task
+        GROUP BY status
+        ORDER BY cnt DESC
+    </select>
+
+    <!-- 5. 查询可重试的失败任务 -->
+    <select id="selectRetryable" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM tb_translation_task
+        WHERE status = 'FAILED'
+        AND retry_count &lt; #{maxRetry}
+        ORDER BY updated_at ASC
+        LIMIT #{limit}
+    </select>
+
+    <!-- 6. 更新进度 -->
+    <update id="updateProgress">
+        UPDATE tb_translation_task
+        SET progress = #{progress},
+            stage = #{stage}
+        WHERE id = #{id}
+    </update>
+
+    <!-- 7. 标记任务成功 -->
+    <update id="markSuccess">
+        UPDATE tb_translation_task
+        SET status = 'SUCCESS',
+            stage = 'COMPLETED',
+            progress = 100,
+            result_path = #{resultPath},
+            error_message = NULL
+        WHERE id = #{id}
+    </update>
+
+    <!-- 8. 标记任务失败（重试次数 +1） -->
+    <update id="markFailed">
+        UPDATE tb_translation_task
+        SET status = 'FAILED',
+            error_message = #{errorMessage},
+            retry_count = retry_count + 1
+        WHERE id = #{id}
+    </update>
+
+    <!-- 9. 超时任务批量标记失败 -->
+    <update id="markTimeoutTasks">
+        UPDATE tb_translation_task
+        SET status = 'FAILED',
+            error_message = '处理超时自动标记失败'
+        WHERE status = 'RUNNING'
+          AND updated_at &lt; CURRENT_TIMESTAMP - (#{minutes} || ' minutes')::INTERVAL
+    </update>
+
+</mapper>
