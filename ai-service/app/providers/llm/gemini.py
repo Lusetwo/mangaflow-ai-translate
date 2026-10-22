@@ -16,19 +16,22 @@ class GeminiLLMProvider(LLMProvider):
         self.timeout = settings.llm_timeout_seconds
         self.proxy = settings.llm_http_proxy
 
-    async def complete(self, prompt: str) -> str:
+    async def complete(self, prompt: str, *, system_prompt: str | None = None) -> str:
         if not self.api_key:
             raise ConfigurationError("LLM_PROVIDER=gemini requires LLM_API_KEY")
         url = f"{self.base_url}/models/{self.model}:generateContent"
         client_kwargs: dict = {"timeout": self.timeout}
         if self.proxy:
             client_kwargs["proxy"] = self.proxy
+        body: dict = {
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {"temperature": 0.2},
+        }
+        if system_prompt:
+            body["systemInstruction"] = {"parts": [{"text": system_prompt}]}
         try:
             async with httpx.AsyncClient(**client_kwargs) as client:
-                response = await client.post(url, params={"key": self.api_key}, json={
-                    "contents": [{"parts": [{"text": prompt}]}],
-                    "generationConfig": {"temperature": 0.2},
-                })
+                response = await client.post(url, params={"key": self.api_key}, json=body)
                 response.raise_for_status()
                 return self._extract_text(response.json())
         except ConfigurationError:

@@ -29,19 +29,23 @@ class OpenAICompatLLMProvider(LLMProvider):
             self._client = httpx.AsyncClient(**client_kwargs)
         return self._client
 
-    async def complete(self, prompt: str) -> str:
+    async def complete(self, prompt: str, *, system_prompt: str | None = None) -> str:
         if not self.api_key:
             raise ConfigurationError(f"LLM_PROVIDER={settings.llm_provider} requires LLM_API_KEY")
         if not self.base_url or not self.model:
             raise ConfigurationError(f"LLM_PROVIDER={settings.llm_provider} requires LLM_BASE_URL and LLM_MODEL")
         url = f"{self.base_url}/chat/completions"
+        messages: list[dict[str, str]] = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": prompt})
         try:
             response = await self._get_client().post(url, headers={
                 "Authorization": f"Bearer {self.api_key}",
                 "Content-Type": "application/json",
             }, json={
                 "model": self.model,
-                "messages": [{"role": "user", "content": prompt}],
+                "messages": messages,
                 "temperature": 0.2,
             })
             response.raise_for_status()

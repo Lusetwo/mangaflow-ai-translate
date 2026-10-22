@@ -2,7 +2,7 @@ from app.providers.llm.base import LLMProvider, TranslationProvider
 
 
 class DemoLLMProvider(LLMProvider):
-    async def complete(self, prompt: str) -> str:
+    async def complete(self, prompt: str, *, system_prompt: str | None = None) -> str:
         return f"[演示回复] {prompt[:80]}"
 
 
